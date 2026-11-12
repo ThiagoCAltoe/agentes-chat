@@ -74,19 +74,51 @@ export function resolveCommand(
   return sharedBin && dirs[0] ? join(dirs[0], command) : command;
 }
 
+/**
+ * One argument on cmd.exe's command line, read back by the program as it was: in quotes, so an empty one stays an
+ * argument and a space, `&` or `|` stays text; backslashes doubled only where they come before a quote; a quote
+ * doubled. `%NAME%` still expands there, so what a person typed goes through its own check first.
+ */
+export const winQuote = (arg: string) => `"${arg.replace(/(\\*)"/g, '$1$1""').replace(/(\\+)$/, "$1$1")}"`;
+
+/**
+ * How a CLI (`command`: a bare name, or a launcher and what it runs) starts with `args`. On Windows a bare name goes
+ * through cmd.exe, the one that finds `claude.cmd` and `claude.exe` alike on the PATH, with every argument quoted:
+ * Node's own `shell: true` joins them as they are, so an empty one (`--setting-sources ""`) vanished and the next
+ * flag became its value, and a path with a space split in two. Elsewhere, and for a launcher: the file and its argv,
+ * no shell.
+ */
+export function cliSpawn(
+  command: readonly string[],
+  args: readonly string[],
+  pathList?: string,
+  platform: NodeJS.Platform = process.platform,
+): { file: string; args: string[]; windowsVerbatimArguments?: true } {
+  const [file = "", ...pre] = command;
+  if (platform === "win32" && command.length === 1) {
+    const line = [file, ...args].map(winQuote).join(" ");
+    return {
+      file: process.env.ComSpec || "cmd.exe",
+      args: ["/d", "/s", "/c", `"${line}"`],
+      windowsVerbatimArguments: true,
+    };
+  }
+  return { file: resolveCommand(file, pathList), args: [...pre, ...args] };
+}
+
 const defaultRun: Run = (command, args) =>
   new Promise((resolve) => {
+    const run = cliSpawn([command], args);
     execFile(
-      resolveCommand(command),
-      args,
+      run.file,
+      run.args,
       {
         encoding: "utf8",
         timeout: 8000,
         maxBuffer: 1024 * 1024,
         windowsHide: true,
         env: process.env,
-        // Windows finds `claude.cmd` / `codex.cmd` only through the shell.
-        shell: process.platform === "win32",
+        windowsVerbatimArguments: run.windowsVerbatimArguments,
       },
       (err, stdout, stderr) => {
         const code = (err as { code?: unknown } | null)?.code;
@@ -240,12 +272,20 @@ export function parseOpencodeModels(output: string): CursorModelInfo[] {
   return out;
 }
 
-/** OpenCode's versions are plain semver (`1.19.5`): an `opencode` on the PATH that says anything else is skipped. */
-const OPENCODE_VERSION = /^v?\d+\.\d+\.\d+\b/;
+/**
+ * OpenCode's versions are plain semver (`1.19.5`), behind its name since 2.2 (`opencode v2.2.7`): an `opencode` on the
+ * PATH that says anything else is skipped.
+ */
+const OPENCODE_VERSION = /^(?:opencode\s+)?v?\d+\.\d+\.\d+\b/;
 
-/** Protocol 39 (ADR 0132): OpenCode's CLI and the models it lists (`opencode models`: the free tier with no key). */
-function detectOpencode(run: Run): Promise<Probe> {
-  return detectWithModels(run, OPENCODE_BIN, OPENCODE_VERSION, parseOpencodeModels);
+/**
+ * Protocol 39 (ADR 0132): OpenCode's CLI and the models it lists (`opencode models`: the free tier with no key). Its
+ * version is kept without the name.
+ */
+async function detectOpencode(run: Run): Promise<Probe> {
+  const probe = await detectWithModels(run, OPENCODE_BIN, OPENCODE_VERSION, parseOpencodeModels);
+  if (probe.entry) probe.entry = { ...probe.entry, version: probe.entry.version.replace(/^opencode\s+/, "") };
+  return probe;
 }
 
 /** xAI's Grok Build CLI. Always `grok`: its installer also makes `~/.local/bin/agent`, which is Cursor's name. */
@@ -390,6 +430,8 @@ export interface ExecutorsCache {
   readonly known: boolean;
   /** The list, waiting for the first look when none is known yet. */
   ready(): Promise<Executors>;
+  /** A look now, whatever the TTL says (the app's "Check again" after an install). */
+  fresh(): Promise<Executors>;
 }
 
 /**
@@ -439,6 +481,7 @@ export function cachedExecutors(
     return value;
   }) as ExecutorsCache;
   get.ready = () => (known ? Promise.resolve(get()) : look());
+  get.fresh = look;
   Object.defineProperty(get, "known", { get: () => known });
   return get;
 }

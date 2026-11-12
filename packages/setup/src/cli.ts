@@ -229,7 +229,7 @@ interface AskOptions {
   description?: string[];
   initial?: string;
   placeholder?: string;
-  /** Typed unseen, and shown cut short once answered. */
+  /** Typed unseen, and never shown once answered. */
   secret?: boolean;
   /** Without an answer: asked again on a terminal, this problem when piped. */
   missing?: Problem;
@@ -344,7 +344,7 @@ function createUi(opts: Options) {
           const answer = (line ?? "").trim() || o.initial || "";
           const problem = answer ? (o.validate?.(answer) ?? null) : o.missing ? "an answer is needed." : null;
           if (!problem) {
-            term.answered(title, o.secret ? `${answer.slice(0, 12)}…` : answer, o.label ? `${o.label}: ` : "");
+            term.answered(title, answer, o.label ? `${o.label}: ` : "", o.secret);
             return answer;
           }
           if (!interactive || line === null) {
@@ -618,7 +618,24 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
   if (found) ui.note(`Found ${found} in ${dir}: only what's missing is filled in.`);
   else if (!ui.inherited) ui.note(`Setting up in ${dir}.`);
 
-  // Docker first: without it nothing below can run.
+  const mac = process.platform === "darwin";
+  const machine: ThisMachine = {
+    platform: process.platform,
+    arch: process.arch,
+    memory: totalmem(),
+    root: process.getuid?.() === 0,
+    systemd: existsSync("/run/systemd/system"),
+    bpf: /\+BPF_FRAMEWORK\b/.test(spawnSync("systemctl", ["--version"], { encoding: "utf8" }).stdout ?? ""),
+    apt: spawnSync("sh", ["-c", "command -v apt-get"], { stdio: "ignore" }).status === 0,
+    connected:
+      connectedConfig(readOrNull(join(mac ? RUNNER_HOME : SYSTEM_RUNNER_HOME, "config.json"))) ||
+      (!mac && connectedConfig(readOrNull(join(SIMPLE_RUNNER_HOME, "config.json")))),
+  };
+  const offer = computerOffer(machine, content, image, dir);
+  // --computer yes where it can't be (as a user other than root on Linux, say) stops before Docker or any question.
+  if (opts.computer === "yes" && "problem" in offer) throw new SetupError(offer.problem);
+
+  // Docker before any question: without it nothing below can run.
   const dockerCheck = image ? null : checkDocker();
   if (dockerCheck && "problem" in dockerCheck && !opts.dryRun) throw new SetupError(dockerCheck.problem);
   if (dockerCheck && "label" in dockerCheck && !ui.inherited) ui.ok(dockerCheck.label);
@@ -714,20 +731,6 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
   if (listQuestions && preset === null) questions.push("email for invitations and password resets (skip by default)");
   const email = await emailEntries(opts, ui, preset, content, network, domain, entries);
 
-  const mac = process.platform === "darwin";
-  const machine: ThisMachine = {
-    platform: process.platform,
-    arch: process.arch,
-    memory: totalmem(),
-    root: process.getuid?.() === 0,
-    systemd: existsSync("/run/systemd/system"),
-    bpf: /\+BPF_FRAMEWORK\b/.test(spawnSync("systemctl", ["--version"], { encoding: "utf8" }).stdout ?? ""),
-    apt: spawnSync("sh", ["-c", "command -v apt-get"], { stdio: "ignore" }).status === 0,
-    connected:
-      connectedConfig(readOrNull(join(mac ? RUNNER_HOME : SYSTEM_RUNNER_HOME, "config.json"))) ||
-      (!mac && connectedConfig(readOrNull(join(SIMPLE_RUNNER_HOME, "config.json")))),
-  };
-  const offer = computerOffer(machine, content, image);
   const files = computerFiles(mac, homedir(), RUNNER_HOME, !("problem" in offer) && offer.simple);
   const asked = listQuestions ? questions : null;
   const computer = await chooseComputer(opts, ui, {
