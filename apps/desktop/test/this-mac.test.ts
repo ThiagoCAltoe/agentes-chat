@@ -160,15 +160,15 @@ test("connect: pairs with the asking page's own server; the first organization s
   expect(await answer).toEqual({ userCode: "ABCD-EFGH" });
   expect(opensAtLogin).toBe(false);
 
-  // Confirmed on the site, and no other organization here has tools to copy: commands and the browser on, Claude Code
-  // on because it was found here, Codex (not found) off.
+  // Confirmed on the site, and no other organization here has tools to copy: everything on, Codex too, which no
+  // runner found here (installed later, it works without a trip to Preferences).
   event("new1", { kind: "pair.done", org: { id: "o2", name: "Beta" }, machine: { id: "m2", name: "MacBook" } });
   await settle();
   await settle();
   const tools = sent.filter((s) => s.homeId === "new1" && s.type === "tools.set").map((s) => [s.tool, s.on]);
   expect(tools).toEqual([
     ["claude", true],
-    ["codex", false],
+    ["codex", true],
     ["commands", true],
     ["browser", true],
   ]);
@@ -225,7 +225,7 @@ test("connect: the pairing sheet's choices go over the defaults; a home that com
   await settle();
   expect(toolsOf("new1")).toEqual([
     ["claude", true],
-    ["codex", false],
+    ["codex", true],
     ["commands", false],
     ["browser", false],
   ]);
@@ -250,13 +250,13 @@ test("the server here's own new home: the same open tools as any pairing, comman
   await settle();
   expect(sent.filter((s) => s.type === "tools.set").map((s) => [s.tool, s.on])).toEqual([
     ["claude", true],
-    ["codex", false],
+    ["codex", true],
     ["commands", true],
     ["browser", true],
   ]);
 });
 
-test("Preferences' tools: commands read on only when every organization has them, and say who does", () => {
+test("Preferences' tools: commands read on only when every organization has them", () => {
   const home = (name: string, commands: boolean) =>
     ({
       status: { org: { id: name, name } },
@@ -264,15 +264,12 @@ test("Preferences' tools: commands read on only when every organization has them
     }) as unknown as Home;
   expect(toolsHere([home("Acme", true), home("Beta", false)])).toEqual({
     tools: { claude: true, codex: false, commands: false, browser: true },
-    commandsOnlyFor: ["Acme"],
   });
   expect(toolsHere([home("Acme", true), home("Beta", true)])).toMatchObject({
     tools: { commands: true },
-    commandsOnlyFor: [],
   });
   expect(toolsHere([])).toEqual({
     tools: { claude: false, codex: false, commands: false, browser: false },
-    commandsOnlyFor: [],
   });
 });
 

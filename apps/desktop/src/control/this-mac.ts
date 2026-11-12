@@ -19,7 +19,6 @@ import {
   isPairedHome,
   isRefusedHome,
   isUnpairedHome,
-  orgName,
   pairedHomes,
   type Snapshot,
 } from "./store";
@@ -190,12 +189,13 @@ export const toolsFound = (snap: Snapshot, homeId?: string) =>
 
 /**
  * A new pairing's tools, open (ADR 0165): commands on; Claude Code, Codex and the browser as the other workspaces here
- * have them (they are for the whole computer), else Claude Code and Codex when found and the browser on.
+ * have them (they are for the whole computer), else all three on. Claude Code and Codex are on whether or not a runner
+ * found them yet: one installed later (Prepare this Mac, or by the person) then works, instead of the site saying it
+ * is turned off here.
  */
 export function pairTools(snap: Snapshot, homeId?: string): PairTools {
-  const found = toolsFound(snap, homeId) ?? {};
   const others = pairedHomes(snap).find((h) => h.homeId !== homeId)?.access?.tools;
-  const base = others ?? { claude: !!found.claude, codex: !!found.codex, browser: true };
+  const base = others ?? { claude: true, codex: true, browser: true };
   return { claude: !!base.claude, codex: !!base.codex, commands: true, browser: !!base.browser };
 }
 
@@ -209,17 +209,20 @@ export async function firstTools(store: DesktopStore, homeId: string, chosen: Pa
 }
 
 /**
- * The tools as Preferences › Tools shows them, one switch each for every organization here. Commands may be on
- * for some only (turned off at pairing, or the server here's own): the switch is on when all have them, and
- * `commandsOnlyFor` names the organizations that do while others don't.
+ * The tools as Preferences › Tools shows them: Claude Code, Codex and the browser, one switch each for every
+ * organization here. Commands are each organization's own (`home.access.tools.commands`): here, on when all have them.
  */
-export function toolsHere(homes: readonly Home[]): { tools: RunnerTools; commandsOnlyFor: string[] } {
+export function toolsHere(homes: readonly Home[]): { tools: RunnerTools } {
   const known = homes.filter((h) => h.access);
   const tools = known[0]?.access?.tools ?? { claude: false, codex: false, commands: false, browser: false };
-  const withCommands = known.filter((h) => h.access?.tools.commands);
-  const all = known.length > 0 && withCommands.length === known.length;
-  return { tools: { ...tools, commands: all }, commandsOnlyFor: all ? [] : withCommands.map(orgName) };
+  return { tools: { ...tools, commands: known.length > 0 && known.every((h) => h.access?.tools.commands) } };
 }
+
+/** The line that installs each coding CLI, shown under its row while it isn't found. */
+export const CLI_INSTALL = {
+  claude: "npm i -g @anthropic-ai/claude-code",
+  codex: "npm i -g @openai/codex",
+} as const;
 
 /**
  * Once the pairing is confirmed, the new organization's first tools (`chosen` over the defaults; null for a home that
