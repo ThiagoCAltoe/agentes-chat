@@ -266,3 +266,55 @@ describe("the agent's page beside its conversation", () => {
     expect(panel()).toBeNull();
   });
 });
+
+test("Sua IA on my own Claude plan picks its model: Automático or always one, saved for my DM alone", async () => {
+  const state = withRightHand(seedState());
+  const me = state.me?.organizations[0];
+  if (me) me.role = "member";
+  const api = createFakeApi(state);
+  let model: string | null = null;
+  api.agents.brain = async (_org, id) =>
+    fakeAgentBrain(id, {
+      scope: "mine",
+      brain: "claude_code",
+      account: "acc-ana",
+      accounts: [planOf(state.me?.user.id)],
+      model,
+      effectiveModel: model ?? "sonnet",
+      onlyOwner: true,
+      canUsePlans: true,
+      workspaceAi: { brain: "model", ownerId: null, servesYou: true, key: { provider: "openai", label: "OpenAI" } },
+    });
+  const sent: unknown[] = [];
+  api.agents.setBrain = async (_org, id, input) => {
+    sent.push(input);
+    model = input.model ?? null;
+    return fakeAgentBrain(id);
+  };
+  await renderApp(`/org/${ORG_ID}/agents/${LODI_ID}`, { api });
+  await settle(8);
+  await act(async () => fireEvent.click(row(/^Sua IA/)));
+  await settle(4);
+  const dialog = screen().getByRole("dialog", { name: "Sua IA" });
+  // Under my plan, chosen: its model, the plan's default until I pick one.
+  const box = within(dialog).getByRole("combobox", { name: "Modelo" });
+  expect(box.textContent).toBe("Sonnet");
+  await act(async () => fireEvent.keyDown(box, { key: "ArrowDown" }));
+  const list = within(document.body).getByRole("listbox");
+  expect(
+    within(list)
+      .getAllByRole("option")
+      .map((o) => o.textContent),
+  ).toEqual([
+    "AutomáticoEscolhe o modelo e o esforço para cada tarefa",
+    "OpusO mais capaz. Gasta o plano mais rápido.",
+    "SonnetEquilibrado. Bom para quase tudo.",
+    "HaikuRápido e leve. Para tarefas simples.",
+  ]);
+  await act(async () => fireEvent.click(within(list).getByRole("option", { name: /^Opus/ })));
+  await settle(6);
+  expect(sent).toEqual([{ scope: "mine", model: "opus" }]);
+  expect(
+    within(screen().getByRole("dialog", { name: "Sua IA" })).getByRole("combobox", { name: "Modelo" }).textContent,
+  ).toBe("Opus");
+});

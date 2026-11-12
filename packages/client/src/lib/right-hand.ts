@@ -1,8 +1,20 @@
 import type { TFunction } from "i18next";
 import type { ApiClient } from "../api/client";
-import type { Agent, AgentBrain, AgentStatus, BrainScope, Credential, DirectMessage, Me, Model } from "../api/types";
+import type {
+  Agent,
+  AgentBrain,
+  AgentBrainInput,
+  AgentStatus,
+  BrainScope,
+  Credential,
+  DirectMessage,
+  Me,
+  Model,
+} from "../api/types";
+import { effortLevel } from "./brain-advanced";
 import { agentGrammar } from "./grammar";
-import { AUTO, keyRuns, providerLabel } from "./providers";
+import { type BrainModelChoice, brainModelChoice, brainModelChoices, brainPlan } from "./plans";
+import { AUTO, isAuto, keyRuns, providerLabel } from "./providers";
 
 /** The workspace's right hand (ADR 0137): every surface that treats it apart asks here. */
 export const isRightHand = (agent: Pick<Agent, "builtin"> | null | undefined) => agent?.builtin === "right_hand";
@@ -71,6 +83,46 @@ export function mineStatus(
     return maker ? { kind: "key", label: providerLabel(maker), provider: maker } : { kind: "key" };
   }
   return ai.servesYou ? { kind: "plan", brain: ai.brain } : { kind: "nobody" };
+}
+
+/**
+ * The models the person's own plan offers their DM with the right hand ("Sua IA", ADR 0137 §11), as the agent page's
+ * model picker lists them for any agent on a plan, and the one it thinks with now (`AUTO` for Automático). Null on the
+ * workspace's AI (an API key's model is the workspace's, set under it) or a plan that names no models.
+ */
+export function mineModels(
+  view: AgentBrain | undefined,
+): { choices: BrainModelChoice[]; value: string; defaultModel: string | null } | null {
+  if (!view || view.brain === "model") return null;
+  const option = view.options.find((o) => o.kind === view.brain);
+  const plan = brainPlan(view);
+  const choices = brainModelChoices(
+    plan,
+    option?.models ?? [],
+    view.accounts.find((a) => a.id === view.account)?.provider,
+  );
+  if (choices.length === 0) return null;
+  const now = view.effectiveModel ?? option?.defaultModel ?? "";
+  return {
+    choices,
+    value: isAuto(now) ? AUTO : brainModelChoice(view.brain, plan, now),
+    defaultModel: option?.defaultModel ?? null,
+  };
+}
+
+/**
+ * What choosing `model` for "Sua IA" saves, as the agent page saves it: the brain's default as none, and the effort
+ * with it (Automático picks the effort too; a fixed model takes the level it had).
+ */
+export function mineModelInput(
+  view: Pick<AgentBrain, "effort">,
+  model: string,
+  defaultModel: string | null,
+): AgentBrainInput {
+  const level = effortLevel(view.effort);
+  const next = isAuto(model) ? AUTO : level;
+  const was = isAuto(view.effort) ? AUTO : level;
+  return { scope: "mine", model: model === defaultModel ? null : model, ...(next !== was ? { effort: next } : {}) };
 }
 
 /**

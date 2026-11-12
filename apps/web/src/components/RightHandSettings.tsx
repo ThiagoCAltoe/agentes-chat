@@ -12,13 +12,14 @@ import {
   useWorkspaceUsesApi,
 } from "@agenteschat/client";
 import { audienceOf, audiencePatch } from "@agenteschat/client/lib/audience";
+import { brainModelLine } from "@agenteschat/client/lib/brain-picker";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { handleAfterRename } from "@agenteschat/client/lib/new-agent";
 import { can } from "@agenteschat/client/lib/permissions";
-import { accountPlan, planReplies } from "@agenteschat/client/lib/plans";
+import { accountPlan, brainPlan, planReplies } from "@agenteschat/client/lib/plans";
 import { AUTO, modelChoices } from "@agenteschat/client/lib/providers";
-import { mineStatus } from "@agenteschat/client/lib/right-hand";
+import { mineModelInput, mineModels, mineStatus } from "@agenteschat/client/lib/right-hand";
 import {
   AffixInput,
   BrainLogo,
@@ -127,22 +128,41 @@ export function RightHandMineRow({ agent }: { agent: Agent }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const status = mineStatus(view, me.user.id, platform, agent.brain?.maker);
-  if (!status) return null;
+  if (!status || !view) return null;
   const first = (id: string) => dir.memberById.get(id)?.name.split(" ")[0] ?? "";
-  const back = () => {
+  const saveMine = (input: AgentBrainInput, after?: () => void) => {
     setBusy(true);
     void api.agents
-      .setBrain(org.id, agent.id, { scope: "mine", brain: "model" })
+      .setBrain(org.id, agent.id, input)
       .then(() =>
         Promise.all([
           qc.invalidateQueries({ queryKey: keys.agentBrain(org.id, agent.id) }),
           qc.invalidateQueries({ queryKey: keys.aiStatus(org.id) }),
         ]),
       )
-      .then(() => setOpen(false))
+      .then(() => after?.())
       .catch((e) => toast.show(errorText(t, e), "error"))
       .finally(() => setBusy(false));
   };
+  const back = () => saveMine({ scope: "mine", brain: "model" }, () => setOpen(false));
+  // Its own plan's model, as any agent's on its page: Automático, or one model every turn.
+  const models = status.kind === "own" ? mineModels(view) : null;
+  const plan = brainPlan(view);
+  const cursorPlanSays = view.brain === "cursor" && (models?.choices.some((m) => m.inPlan) ?? false);
+  const modelPicker = models && (
+    <ModelSelect
+      aria-label={t("rightHand.field.model")}
+      value={models.value}
+      onChange={(model) => model !== models.value && saveMine(mineModelInput(view, model, models.defaultModel))}
+      options={[
+        { value: AUTO, label: t("brain.auto.label"), description: t("brain.auto.hint") },
+        ...models.choices.map((m) => {
+          const line = brainModelLine(t, view.brain, plan, m, cursorPlanSays);
+          return { value: m.value, label: m.label, ...(line ? { description: line } : {}) };
+        }),
+      ]}
+    />
+  );
   // Connecting is a dialog of its own: this one closes for it.
   const connectMine = connect
     ? () => {
@@ -183,7 +203,8 @@ export function RightHandMineRow({ agent }: { agent: Agent }) {
     </span>
   );
   const options: OptionListItem<"mine" | "other" | "workspace">[] = [];
-  if (own) options.push({ value: "mine", title: name, description: what });
+  if (own)
+    options.push({ value: "mine", title: name, description: what, ...(modelPicker ? { children: modelPicker } : {}) });
   // On a billing hold nothing connects before the plan, whose one way in is the hold's banner (ADR 0162).
   if (connectMine && !held)
     options.push(
