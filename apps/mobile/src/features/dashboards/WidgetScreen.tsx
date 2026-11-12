@@ -1,4 +1,5 @@
 import {
+  scheduleText,
   useAskWidgetChange,
   useBuildOnceAi,
   useDesktopStatus,
@@ -121,7 +122,7 @@ function Detail({ widget: w, refetch }: { widget: WidgetDetail; refetch: () => P
       {
         onSuccess: () => {
           successHaptic();
-          const when = t(`widgets.schedulesInline.${schedule}`);
+          const when = scheduleText(t, schedule, "inline");
           toast({ title: t("mobile.dashboards.widget.scheduleSaved", { schedule: when }) });
         },
         onError: failed,
@@ -132,7 +133,7 @@ function Detail({ widget: w, refetch }: { widget: WidgetDetail; refetch: () => P
   const pickSchedule = () =>
     pick(
       t("dashboards.newWidget.updates"),
-      WIDGET_SCHEDULES.map((s) => ({ key: s, label: t(`widgets.schedules.${s}`) })),
+      WIDGET_SCHEDULES.map((s) => ({ key: s, label: scheduleText(t, s) })),
       w.schedule,
       setSchedule,
     );
@@ -305,7 +306,7 @@ function Detail({ widget: w, refetch }: { widget: WidgetDetail; refetch: () => P
             <GroupedList>
               <GroupedRow
                 icon="clock"
-                label={t(`widgets.schedules.${w.schedule}`)}
+                label={scheduleText(t, w.schedule)}
                 sub={next}
                 subLines={2}
                 menu={w.canEdit}

@@ -1,4 +1,5 @@
 import {
+  scheduleText,
   useAiStatusSince,
   useConfirmWidget,
   useDashboards,
@@ -344,7 +345,7 @@ export function NewWidgetScreen({ dashboardId }: { dashboardId: string }) {
       WIDGET_SCHEDULES.map(
         (s): PickItem<WidgetSchedule> => ({
           key: s,
-          label: t(`widgets.schedules.${s}`),
+          label: scheduleText(t, s),
           leading: <Icon name="clock" size={18} color={c.muted} />,
         }),
       ),
@@ -581,7 +582,7 @@ export function NewWidgetScreen({ dashboardId }: { dashboardId: string }) {
           <GroupedRow
             key="updates"
             label={t("dashboards.newWidget.updates")}
-            value={t(`widgets.schedules.${schedule}`)}
+            value={scheduleText(t, schedule)}
             menu
             onPress={openSchedules}
           />
