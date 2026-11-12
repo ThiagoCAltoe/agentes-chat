@@ -1,4 +1,5 @@
 import {
+  scheduleText,
   useConfirmWidget,
   useDashboards,
   useHomeDashboard,
@@ -311,7 +312,7 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
       WIDGET_SCHEDULES.map(
         (s): PickItem<WidgetSchedule> => ({
           key: s,
-          label: t(`widgets.schedules.${s}`),
+          label: scheduleText(t, s),
           leading: <Icon name="clock" size={18} color={c.muted} />,
         }),
       ),
@@ -556,13 +557,13 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
         <Pressable
           onPress={openSchedules}
           accessibilityRole="button"
-          accessibilityLabel={`${t("dashboards.newWidget.updates")}: ${t(`widgets.schedules.${schedule}`)}`}
+          accessibilityLabel={`${t("dashboards.newWidget.updates")}: ${scheduleText(t, schedule)}`}
           hitSlop={FOOT_SLOP}
           style={({ pressed }) => [styles.footPick, styles.shrink, pressed && styles.pressed]}
         >
           <Icon name="clock" size={13} color={c.muted} />
           <Text variant="footnote" numberOfLines={1} style={[styles.shrink, { color: c.ink2 }]}>
-            {t(`widgets.schedulesInline.${schedule}`)}
+            {scheduleText(t, schedule, "inline")}
           </Text>
           <Icon name="down" size={13} color={c.muted} />
         </Pressable>

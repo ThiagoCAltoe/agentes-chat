@@ -1,5 +1,6 @@
 import type { Agent, PinnableBlock, Widget, WidgetFormat, WidgetSchedule, WidgetSize } from "@agenteschat/client";
 import {
+  scheduleText,
   useAgents,
   useConfirmWidget,
   useDashboards,
@@ -37,13 +38,7 @@ import {
   WidgetGlyph,
   widgetTileVars,
 } from "@agenteschat/ui";
-import {
-  sizeToLayout,
-  WIDGET_FORMATS,
-  WIDGET_SCHEDULES,
-  WIDGET_SIZES,
-  type WidgetSpec,
-} from "@agenteschat/ui/widgets/spec";
+import { sizeToLayout, WIDGET_FORMATS, WIDGET_SIZES, type WidgetSpec } from "@agenteschat/ui/widgets/spec";
 import type { TFunction } from "i18next";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -52,6 +47,7 @@ import { AgentPickerDialog } from "@/components/agents/AgentPickerDialog";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { failureText } from "@/components/widgets/parts";
+import { WidgetScheduleSelect } from "@/components/widgets/WidgetScheduleSelect";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import "@/pages/dashboards.css";
@@ -446,21 +442,20 @@ function NewWidgetBody({
       if (mode === "pin") return inline ? t("dashboards.newWidget.noUpdateInline") : t("dashboards.newWidget.noUpdate");
       return inline ? t("dashboards.newWidget.manualInline") : t("dashboards.newWidget.manual");
     }
-    return inline ? t(`widgets.schedulesInline.${s}`) : t(`widgets.schedules.${s}`);
+    return scheduleText(t, s, inline ? "inline" : "full");
   };
   // Only the schedules: what each costs stays out of this dialog (the agent's budget still applies to every run).
   const scheduleSelect = (
-    <Select<WidgetSchedule>
+    <WidgetScheduleSelect
       className="nwc-pk"
-      size="sm"
-      aria-label={t("dashboards.newWidget.updates")}
+      label={t("dashboards.newWidget.updates")}
       value={schedule}
-      onValueChange={setSchedule}
-      options={WIDGET_SCHEDULES.map((s) => ({ value: s, label: scheduleWords(s, false) }))}
-      renderValue={(o) => (
+      onChange={setSchedule}
+      words={(s) => scheduleWords(s, false)}
+      renderValue={(s) => (
         <span className="nwc-pk__v">
           <Icon name="repeat" size={14} />
-          {scheduleWords(o.value, true)}
+          {scheduleWords(s, true)}
         </span>
       )}
     />

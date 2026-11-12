@@ -1,5 +1,5 @@
 import type { Widget, WidgetFailure, WidgetKind } from "@agenteschat/client";
-import { widgetFailureKey } from "@agenteschat/client";
+import { scheduleText, widgetFailureKey } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { type AgentColor, Icon, PixelSpinner } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
@@ -68,7 +68,7 @@ export function WidgetFoot({
   resolving?: boolean;
 }) {
   const { t, i18n } = useTranslation();
-  const schedule = t(`widgets.schedulesInline.${widget.schedule}`);
+  const schedule = scheduleText(t, widget.schedule, "inline");
   if (widget.status === "building")
     return (
       <>

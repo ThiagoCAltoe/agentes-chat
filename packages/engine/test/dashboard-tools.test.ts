@@ -286,6 +286,27 @@ describe("create_widget", () => {
     expect(await widgets()).toHaveLength(1);
   });
 
+  test("every N hours as h:N; a schedule it can't keep is refused, never read as manual", async () => {
+    const results = await setupAgent((req) => {
+      const said = JSON.stringify(req.messages.at(-1)?.content);
+      const widget = (schedule: string) => [
+        {
+          name: "create_widget",
+          input: { title: "Estoque", prompt: "Itens abaixo do mínimo", schedule, data: { kind: "text", items: ["2"] } },
+        },
+      ];
+      if (said.includes("seis")) return widget("h:6");
+      if (said.includes("zero")) return widget("h:0");
+      return [];
+    });
+    await ask("acompanha o estoque a cada seis horas");
+    expect(results.at(-1)).toContain("updated every 6 hours");
+    expect((await widgets()).map((w) => w.schedule)).toEqual(["h:6"]);
+    await ask("e a cada zero horas");
+    expect(results.at(-1)).toContain("«h:0» isn't a schedule");
+    expect(await widgets()).toHaveLength(1);
+  });
+
   test("invalid data is refused with what to fix", async () => {
     const goal = { title: "Meta", prompt: "Meta do mês", schedule: "manual", data: { kind: "goal" } };
     const results = await setupAgent((req) =>

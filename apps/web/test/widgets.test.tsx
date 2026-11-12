@@ -379,6 +379,41 @@ describe("a widget's side panel", () => {
     expect((router.state.location.search as { widget?: string }).widget).toBeUndefined();
   });
 
+  test("every N hours: picked, a number beside it; left or Enter saves a whole number from 1 to 720, never another", async () => {
+    const s = setup();
+    const { state } = await open(`/org/${ORG_ID}/home`, s);
+    await click(within(widget("Vendas hoje")).getByRole("button", { name: "Vendas hoje" }));
+    await settle(4);
+    const panel = screen().getByRole("dialog", { name: "Vendas hoje" });
+    const how = within(panel).getByRole("region", { name: "Como atualiza" });
+    const saved = () => state.calls.filter((c) => c.method === "dashboards.updateWidget").map((c) => c.args[2]);
+    await pick(within(how).getByRole("combobox", { name: "Mudar quando atualiza" }), "A cada … horas");
+    expect(saved()).toEqual([{ schedule: "h:6" }]);
+    await settle(3);
+    const hours = within(how).getByRole("spinbutton", { name: "A cada quantas horas" }) as HTMLInputElement;
+    expect(hours.value).toBe("6");
+    expect(how.textContent).toContain("A cada 6 horas");
+    // Typed and left: saved.
+    await act(async () => fireEvent.change(hours, { target: { value: "36" } }));
+    await act(async () => fireEvent.blur(hours));
+    await settle(3);
+    expect(saved().at(-1)).toEqual({ schedule: "h:36" });
+    // Out of the range: said under it, nothing saved.
+    const count = saved().length;
+    await act(async () => fireEvent.change(hours, { target: { value: "0" } }));
+    await act(async () => fireEvent.keyDown(hours, { key: "Enter" }));
+    expect(within(how).getByRole("alert").textContent).toBe("De 1 a 720 horas.");
+    await act(async () => fireEvent.change(hours, { target: { value: "721" } }));
+    await act(async () => fireEvent.blur(hours));
+    expect(saved()).toHaveLength(count);
+    // Enter saves too.
+    await act(async () => fireEvent.change(hours, { target: { value: "12" } }));
+    await act(async () => fireEvent.keyDown(hours, { key: "Enter" }));
+    await settle(3);
+    expect(saved().at(-1)).toEqual({ schedule: "h:12" });
+    expect(within(how).queryByRole("alert")).toBeNull();
+  });
+
   test("its title is renamed in place: Enter saves, Esc cancels and keeps the panel open", async () => {
     const s = setup();
     const { state } = await open(`/org/${ORG_ID}/home?widget=${s.sales.id}`, s);
