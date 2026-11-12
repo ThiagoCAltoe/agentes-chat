@@ -1,6 +1,6 @@
 # 0066. One desktop app: agentes.chat, your own server, or a server here
 
-- Status: Accepted. Built: the first run, the server list, links, agents here for your own server, Preferences by mode, Windows and Linux builds, and agentes.chat on this computer (§7). Amended 2026-10-26: Windows gets what a Mac has, agents here and agentes.chat on this PC (§5–§7). Superseded in part by ADR 0077 (2026-10-28): §8, coming from the menu bar app. With no `servers.json` the app starts with an empty list and shows the first run; homes a terminal install's `agentes-runner host` keeps are still never started unless they are the server here's own (§7). Superseded in part by ADR 0165 (2026-11-09) for the devices people bring: §3's "a link never pairs this computer" (a link may, after the person confirms in the app) and §4/§5's agentes.chat as a plain client (the app pairs this computer with agentes.chat too).
+- Status: Accepted. Amended 2026-11-11: only a click opens a notification's page (§ Amendment at the end). Built: the first run, the server list, links, agents here for your own server, Preferences by mode, Windows and Linux builds, and agentes.chat on this computer (§7). Amended 2026-10-26: Windows gets what a Mac has, agents here and agentes.chat on this PC (§5–§7). Superseded in part by ADR 0077 (2026-10-28): §8, coming from the menu bar app. With no `servers.json` the app starts with an empty list and shows the first run; homes a terminal install's `agentes-runner host` keeps are still never started unless they are the server here's own (§7). Superseded in part by ADR 0165 (2026-11-09) for the devices people bring: §3's "a link never pairs this computer" (a link may, after the person confirms in the app) and §4/§5's agentes.chat as a plain client (the app pairs this computer with agentes.chat too).
 - Date: 2026-10-25
 - Supersedes: ADR 0036's menu-bar-first model, its "the runner ships and starts in every install", and §11's "the main window loads agentes.chat only"
 - Extends: ADR 0025 (connected computers), ADR 0035 (phone app, connect links), ADR 0036 (desktop app), ADR 0060 (one-command install)
@@ -35,7 +35,7 @@ The desktop app began as a menu bar app that let agents use this Mac: its first 
 
 - With agentes.chat (or any server whose agents work elsewhere) nothing of this computer runs or shows: no runner starts (the app spawns runners only for homes on disk), no pairing, no folders or tools, no computer words. On a Mac the menu bar icon is off then (the Dock carries the badge); "Show in the menu bar" turns it on, and the app always keeps the Dock icon or the menu bar icon. Windows and Linux have no Dock and closing the window only hides it there, so the tray icon is always on, with a native menu (Linux's AppIndicator passes no clicks to the app); on Linux, where some desktops show no tray, closing the main window minimizes it.
 - Preferences shows General, Servers and Updates; this computer's tabs (Folders, Tools, Activity, Advanced) only while agents work here.
-- The site's notifications (mentions, direct messages, what waits for the person: what a phone gets pushed, ADR 0035 §4) show while the window is in the background (`this_mac` `notify`): at most one every 3 seconds and 60 an hour, title 80 and body 180 characters, a path of the same server, which opens if the person comes back within 30 seconds. "Let me know about messages and requests" turns them off.
+- The site's notifications (mentions, direct messages, what waits for the person: what a phone gets pushed, ADR 0035 §4) show while the window is in the background (`this_mac` `notify`): at most one every 3 seconds and 60 an hour, title 80 and body 180 characters, a path of the same server, which opens when the person clicks it (amended 2026-11-11: coming back to the app no longer opens it). "Let me know about messages and requests" turns them off.
 
 ### 5. Agents on this computer, for your own server
 
@@ -84,3 +84,12 @@ On the first start of an app that keeps a server list (no `servers.json` yet), R
 - A server the person connected to is a website with a narrow bridge: its own homes, a native dialog for every pairing, notifications within limits.
 - Running agentes.chat on this computer needs nothing else installed and no terminal, and moves with the app: one update, one signature, the server and the agents here always the same version. The cost is the app's size (the server's JavaScript and WebAssembly) and a server whose life is the app's: it runs while the app does.
 - Until the first three-platform release, the screens are checked in a browser with the fake host and the Rust in a Linux container (the server here against the real server's files there); the macOS-only parts (the notch, the Dock, the menu bar) are compiled by the macOS build.
+
+## Amendment (2026-11-11): only a click opens a notification's page
+
+The site's notifications kept the page of the last one and opened it whenever the main window came to the front within 30 seconds, because the app could not tell a click from any other way back. Since the notification plugin reports clicks on every system (2.8, `on_action`, which the notification's Stop for a phone in use already relies on), that guess only misfired: a person who went to the browser or a chat app and came back to work found the window moved to Notificações by a notification they never clicked.
+
+- A click (`tap`) opens the notification's page, as it already did (`stop_from_notices`). Coming back to the app any other way (the Dock, the taskbar, a window switcher) leaves the window where it was.
+- The guess is gone with its state (`Notices.pending`, `NOTIFY_OPENS_FOR`).
+- Windows reports a click only while the toast is on screen: a click on one already in the Action Center brings the app forward on the page it showed. The inbox keeps every notification.
+- The server here's own notices (`local_server::take_notice_click`, the popover) are unchanged.
