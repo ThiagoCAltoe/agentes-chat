@@ -11,7 +11,7 @@ import {
 } from "@agenteschat/client";
 import { upcomingAt, whenAt } from "@agenteschat/client/lib/format";
 import { plainInline } from "@agenteschat/client/lib/markdown";
-import { WIDGET_LIMITS, WIDGET_SCHEDULES } from "@agenteschat/ui/widgets/spec";
+import { everyHoursOf, WIDGET_LIMITS, WIDGET_SCHEDULES } from "@agenteschat/ui/widgets/spec";
 import { LinearGradient } from "expo-linear-gradient";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -20,6 +20,7 @@ import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Button,
+  GROUPED_ROW,
   GroupedHeader,
   GroupedList,
   GroupedRow,
@@ -41,7 +42,8 @@ import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { goBack, PushedHeader, successHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import { useAgentLook, useWidgetWords } from "./hooks";
-import { HOME, shownWidgetTitle } from "./logic";
+import { EVERY_HOURS, HOME, schedulePicked, shownWidgetTitle } from "./logic";
+import { EveryHoursInput } from "./parts";
 import { WidgetCard } from "./WidgetView";
 
 /** Rows of the history shown (the server keeps the latest 20). */
@@ -315,6 +317,23 @@ function Detail({ widget: w, refetch }: { widget: WidgetDetail; refetch: () => P
                 />
               ))
             : null}
+          {open === "schedule" ? (
+            <GroupedRow
+              key={EVERY_HOURS}
+              label={t("widgets.everyHoursPick")}
+              checked={everyHoursOf(w.schedule) !== null}
+              onPress={() => {
+                const next = schedulePicked(w.schedule, EVERY_HOURS);
+                if (next !== w.schedule) setSchedule(next);
+              }}
+            />
+          ) : null}
+          {/* Every N hours: its number under its choice, saved on Done or when left. */}
+          {open === "schedule" && everyHoursOf(w.schedule) !== null ? (
+            <View key="every-hours" style={styles.everyHours}>
+              <EveryHoursInput value={w.schedule} onChange={setSchedule} />
+            </View>
+          ) : null}
           <GroupedRow
             icon="bell"
             label={alertLine}
@@ -480,6 +499,8 @@ function AskChange({ widget: w, name }: { widget: WidgetDetail; name: string }) 
 }
 
 const styles = StyleSheet.create({
+  // Every N hours' number, inside the group under its choice, on the rows' leading edge.
+  everyHours: { paddingHorizontal: GROUPED_ROW.padX, paddingBottom: 12 },
   screen: { flex: 1 },
   in: { paddingHorizontal: 16 },
   cares: { paddingHorizontal: 4, marginTop: -6, marginBottom: 10 },

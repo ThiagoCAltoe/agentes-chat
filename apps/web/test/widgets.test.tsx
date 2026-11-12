@@ -617,5 +617,29 @@ describe("Pin from the chat", () => {
     expect(document.body.textContent).toContain("Fixado em Meu Início · Ada refaz todo dia às 8h");
     const added = s.fake.boards.find((b) => b.id === s.home.id)?.widgets.find((w: Widget) => w.sourceMessageId);
     expect(added?.title).toBe("Pedidos por canal");
+
+    // Again, every 12 hours: the same select as a widget's panel, without "only when asked" (that is the switch).
+    await click(within(chart).getByRole("button", { name: "Fixar num painel" }));
+    await settle(4);
+    const again = screen().getByRole("dialog", { name: "Fixar num painel" });
+    await click(within(again).getByRole("switch", { name: "Manter atualizado" }));
+    const every = within(again).getByRole("combobox", { name: "Atualiza" });
+    every.focus();
+    await act(async () => fireEvent.keyDown(every, { key: "Enter" }));
+    const offered = screen()
+      .getAllByRole("option")
+      .map((o) => o.textContent);
+    expect(offered).toContain("A cada … horas");
+    expect(offered.some((o) => o?.includes("Quando eu pedir"))).toBe(false);
+    await click(screen().getByRole("option", { name: "A cada … horas" }));
+    await settle(2);
+    const hours = within(again).getByRole("spinbutton", { name: "A cada quantas horas" });
+    await act(async () => fireEvent.change(hours, { target: { value: "12" } }));
+    await act(async () => fireEvent.blur(hours));
+    await settle(2);
+    expect(again.textContent).toContain("Ada refaz a cada 12 horas");
+    await click(within(again).getByRole("button", { name: "Fixar" }));
+    await settle(4);
+    expect((last(state, "dashboards.pinWidget") as unknown[])[2]).toMatchObject({ schedule: "h:12" });
   });
 });

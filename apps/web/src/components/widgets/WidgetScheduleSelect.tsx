@@ -22,8 +22,8 @@ const FIRST_HOURS = 6;
  * How often a widget's agent redoes it (ADR 0135 §7): the presets, or "Every … hours", which shows a number field
  * (`EveryHoursField`, `h:N` from 1 to 720). `field`: beside the select (`inline`, where a form has the room), or
  * `apart`, drawn by the caller where the row has room (a widget's panel puts it under its row, so the row's words
- * never wrap word by word on a phone). `words` names each preset where a screen says them its own way; `renderValue`
- * draws the chosen one.
+ * never wrap word by word on a phone). `without`: presets a screen doesn't offer (a pin's "manual" is its Keep
+ * updated switch). `words` names each preset where a screen says them its own way; `renderValue` draws the chosen one.
  */
 export function WidgetScheduleSelect({
   value,
@@ -34,6 +34,7 @@ export function WidgetScheduleSelect({
   className,
   label,
   field = "inline",
+  without = [],
   words,
   renderValue,
 }: {
@@ -45,13 +46,17 @@ export function WidgetScheduleSelect({
   className?: string;
   label: string;
   field?: "inline" | "apart";
+  without?: readonly WidgetPreset[];
   words?: (preset: WidgetPreset) => string;
   renderValue?: (schedule: WidgetSchedule) => ReactNode;
 }) {
   const { t } = useTranslation();
   const hours = everyHoursOf(value);
   const options: SelectOption<Choice>[] = [
-    ...WIDGET_SCHEDULES.map((s) => ({ value: s, label: words?.(s) ?? scheduleText(t, s, "short") })),
+    ...WIDGET_SCHEDULES.filter((s) => !without.includes(s)).map((s) => ({
+      value: s,
+      label: words?.(s) ?? scheduleText(t, s, "short"),
+    })),
     { value: EVERY, label: t("widgets.everyHoursPick") },
   ];
   return (
