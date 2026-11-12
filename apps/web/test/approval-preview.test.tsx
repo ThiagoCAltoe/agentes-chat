@@ -59,9 +59,7 @@ describe("an approval's preview: what will happen, drawn as an attachment's cove
   test("a feedback an agent sends: its words as the cover, and all that goes with it before it is approved", async () => {
     const card = await openCard((a) => {
       a.tool = "send_feedback";
-      a.kind = "send_feedback";
       a.title = "Send feedback to whoever runs this server";
-      a.titleParams = {};
       // One of our own tools: no connector, no scope.
       a.connector = null;
       a.connectorAccount = null;
